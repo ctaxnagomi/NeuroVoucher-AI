@@ -107,7 +107,15 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
 }
 
 // --- OCR / Receipt Extraction (Flash) ---
-export const extractReceiptData = async (base64Image: string): Promise<{ payeeName?: string; date?: string; totalAmount?: number } | null> => {
+export const extractReceiptData = async (base64Image: string): Promise<{ 
+    payeeName?: string; 
+    payeeId?: string;
+    date?: string; 
+    totalAmount?: number;
+    companyName?: string;
+    companyRegNo?: string;
+    companyAddress?: string;
+} | null> => {
   const client = getClient();
   try {
     const response = await client.models.generateContent({
@@ -120,7 +128,15 @@ export const extractReceiptData = async (base64Image: string): Promise<{ payeeNa
               mimeType: 'image/jpeg'
             }
           },
-          { text: "Analyze this receipt image. Extract the Payee Name (merchant), Date (YYYY-MM-DD), and Total Amount (numeric). Ensure the total amount includes taxes if applicable." }
+          { text: `Analyze this receipt image. Extract the following details:
+            1. Payee Name (The merchant or vendor name).
+            2. Payee ID (The merchant's registration number, SSM, or business ID).
+            3. Date (YYYY-MM-DD).
+            4. Total Amount (Numeric, including tax).
+            5. Company Name (The 'Bill To' customer name if present).
+            6. Company Registration No (The 'Bill To' registration number if present).
+            7. Company Address (The 'Bill To' address if present).` 
+          }
         ]
       },
       config: {
@@ -129,8 +145,12 @@ export const extractReceiptData = async (base64Image: string): Promise<{ payeeNa
             type: Type.OBJECT,
             properties: {
                 payeeName: { type: Type.STRING },
+                payeeId: { type: Type.STRING },
                 date: { type: Type.STRING },
-                totalAmount: { type: Type.NUMBER }
+                totalAmount: { type: Type.NUMBER },
+                companyName: { type: Type.STRING },
+                companyRegNo: { type: Type.STRING },
+                companyAddress: { type: Type.STRING }
             },
             required: ["payeeName", "totalAmount"]
         }

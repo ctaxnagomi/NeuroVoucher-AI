@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { NeuroCard, NeuroInput, NeuroButton, NeuroBadge, NeuroTextarea } from '../components/NeuroComponents';
 import { generateFastSummary, generateSpeech, extractReceiptData } from '../services/geminiService';
-import { Sparkles, Play, Plus, Trash2, Save, Upload, X } from 'lucide-react';
+import { Sparkles, Play, Plus, Trash2, Save, Upload, X, Calendar, FileText } from 'lucide-react';
 import { VoucherItem } from '../types';
 
 export const VoucherGenerator: React.FC = () => {
@@ -90,30 +90,33 @@ export const VoucherGenerator: React.FC = () => {
             const base64String = (reader.result as string).split(',')[1];
             const data = await extractReceiptData(base64String);
             
-            if (data && Object.keys(data).length > 0) {
-                // Pre-fill Payee
-                if (data.payeeName) setPayee(data.payeeName);
-                if (data.payeeId) setPayeeIc(data.payeeId);
-                if (data.date) {
-                    setVoucherDate(data.date);
-                    setOriginalDate(data.date); // Assumption: Receipt date is the original date
-                }
-                
-                // Pre-fill Company (if 'Bill To' detected)
-                if (data.companyName) setCompanyName(data.companyName);
-                if (data.companyRegNo) setCompanyRegNo(data.companyRegNo);
-                if (data.companyAddress) setCompanyAddress(data.companyAddress);
-
-                if (data.totalAmount) {
-                    setItems([{
-                        id: Date.now().toString(),
-                        description: 'Receipt Import',
-                        amount: data.totalAmount
-                    }]);
-                }
-            } else {
+            if (!data || Object.keys(data).length === 0) {
                 alert('Could not extract data from the receipt image. Please try a clearer photo.');
+                setScanning(false);
+                return;
             }
+            
+            // Pre-fill Payee
+            if (data.payeeName) setPayee(data.payeeName);
+            if (data.payeeId) setPayeeIc(data.payeeId);
+            if (data.date) {
+                setVoucherDate(data.date);
+                setOriginalDate(data.date); // Assumption: Receipt date is the original date
+            }
+            
+            // Pre-fill Company (if 'Bill To' detected)
+            if (data.companyName) setCompanyName(data.companyName);
+            if (data.companyRegNo) setCompanyRegNo(data.companyRegNo);
+            if (data.companyAddress) setCompanyAddress(data.companyAddress);
+
+            if (data.totalAmount) {
+                setItems([{
+                    id: Date.now().toString(),
+                    description: 'Receipt Import',
+                    amount: data.totalAmount
+                }]);
+            }
+            
         } catch (error) {
             console.error(error);
             alert('Error processing receipt.');
@@ -206,10 +209,6 @@ export const VoucherGenerator: React.FC = () => {
                 <Upload size={16} className={scanning ? "animate-bounce text-blue-500" : "text-purple-600"} />
                 {scanning ? 'Analyzing...' : 'Upload Receipt'}
             </NeuroButton>
-            <NeuroButton onClick={handleAISummary} disabled={loadingAI} className="flex items-center gap-2 text-sm">
-                <Sparkles size={16} className={loadingAI ? "animate-spin" : "text-yellow-500"} />
-                {loadingAI ? 'Thinking...' : 'AI Check'}
-            </NeuroButton>
             <NeuroButton onClick={handleReadAloud} disabled={playingAudio} className="flex items-center gap-2 text-sm">
                 <Play size={16} className={playingAudio ? "text-green-500" : "text-blue-500"} />
                 {playingAudio ? 'Reading...' : 'Read Aloud'}
@@ -253,20 +252,42 @@ export const VoucherGenerator: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                          <label className="block text-sm text-gray-500 mb-2">Voucher No.</label>
-                         <NeuroInput 
-                             value={voucherNo} 
-                             onChange={(e) => setVoucherNo(e.target.value)} 
-                             placeholder="PV-2024-001" 
-                         />
+                         <div className="relative">
+                            <NeuroInput 
+                                value={voucherNo} 
+                                onChange={(e) => setVoucherNo(e.target.value)} 
+                                placeholder="PV-2024-001" 
+                                className="pl-10"
+                            />
+                            <FileText size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                         </div>
                     </div>
                     <div>
                          <label className="block text-sm text-gray-500 mb-2">Voucher Date</label>
-                         <NeuroInput type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} />
+                         <div className="relative">
+                            <NeuroInput 
+                                type="date" 
+                                value={voucherDate} 
+                                onChange={(e) => setVoucherDate(e.target.value)} 
+                                className="pl-10"
+                            />
+                            <Calendar size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <label className="block text-sm text-gray-500 mb-2">Description</label>
+                    <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm text-gray-500">Description</label>
+                        <NeuroButton 
+                            onClick={handleAISummary} 
+                            disabled={loadingAI} 
+                            className="!py-1 !px-3 text-xs flex items-center gap-2"
+                        >
+                            <Sparkles size={12} className={loadingAI ? "animate-spin" : "text-yellow-500"} />
+                            {loadingAI ? 'Generating...' : 'AI Auto-Summarize'}
+                        </NeuroButton>
+                    </div>
                     <NeuroTextarea 
                         value={description} 
                         onChange={(e) => setDescription(e.target.value)} 

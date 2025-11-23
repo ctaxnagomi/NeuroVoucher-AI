@@ -17,6 +17,10 @@ export const VoucherGenerator: React.FC = () => {
   const [companyRegNo, setCompanyRegNo] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
 
+  // Authorization Details
+  const [preparedBy, setPreparedBy] = useState('');
+  const [approvedBy, setApprovedBy] = useState('');
+
   // Lost Receipt Details
   const [originalDate, setOriginalDate] = useState('');
   const [lostReason, setLostReason] = useState('');
@@ -69,7 +73,7 @@ export const VoucherGenerator: React.FC = () => {
     const audioBuffer = await generateSpeech(textToRead);
     
     if (audioBuffer) {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(ctx.destination);
@@ -176,8 +180,8 @@ export const VoucherGenerator: React.FC = () => {
             amount: Number(item.amount)
         })),
         authorization: {
-            prepared_by: "User", // Defaults
-            approved_by: "",
+            prepared_by: preparedBy,
+            approved_by: approvedBy,
             designation: ""
         },
         lost_receipt: {
@@ -333,6 +337,25 @@ export const VoucherGenerator: React.FC = () => {
                         onChange={(e) => setPayeeIc(e.target.value)}
                         placeholder="e.g., 880101-14-XXXX" 
                     />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm text-gray-500 mb-2">Prepared By</label>
+                        <NeuroInput 
+                            value={preparedBy} 
+                            onChange={(e) => setPreparedBy(e.target.value)} 
+                            placeholder="Name" 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-gray-500 mb-2">Approved By</label>
+                        <NeuroInput 
+                            value={approvedBy} 
+                            onChange={(e) => setApprovedBy(e.target.value)} 
+                            placeholder="Name" 
+                        />
+                    </div>
                 </div>
             </div>
         </NeuroCard>

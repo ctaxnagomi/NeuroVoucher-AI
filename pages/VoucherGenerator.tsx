@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NeuroCard, NeuroInput, NeuroButton, NeuroBadge, NeuroTextarea, NeuroSelect } from '../components/NeuroComponents';
 import { generateFastSummary, generateSpeech, extractReceiptData, getLiveClient } from '../services/geminiService';
 import { createPcmBlob } from '../services/audioUtils';
-import { Sparkles, Play, Plus, Trash2, Save, Upload, X, Calendar, FileText, AlertTriangle, Building2, User, ScanLine, CheckCircle2, Mic, MicOff, Tag, Info } from 'lucide-react';
-import { VoucherItem } from '../types';
+import { Sparkles, Play, Plus, Trash2, Save, Upload, X, Calendar, FileText, AlertTriangle, Building2, User, ScanLine, CheckCircle2, Mic, MicOff, Tag, Info, Image as ImageIcon, Languages } from 'lucide-react';
+import { VoucherItem, SUPPORTED_LANGUAGES } from '../types';
 import { Modality, LiveServerMessage } from '@google/genai';
 
 const AutoFilledIndicator = () => (
@@ -26,6 +26,7 @@ export const VoucherGenerator: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [companyRegNo, setCompanyRegNo] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
   // Authorization Details
   const [preparedBy, setPreparedBy] = useState('');
@@ -50,6 +51,7 @@ export const VoucherGenerator: React.FC = () => {
   const [showOCRConfirm, setShowOCRConfirm] = useState(false);
   const [extractedData, setExtractedData] = useState<any>(null);
   const [showOCRHelp, setShowOCRHelp] = useState(false);
+  const [ocrLanguage, setOcrLanguage] = useState('en');
   
   // Auto-filled field tracking
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
@@ -75,7 +77,7 @@ export const VoucherGenerator: React.FC = () => {
                 "Meals & Entertainment", 
                 "Utilities", 
                 "Professional Services", 
-                "Medical",
+                "Medical", 
                 "Maintenance & Repairs",
                 "Training & Development"
             ];
@@ -235,7 +237,8 @@ export const VoucherGenerator: React.FC = () => {
     reader.onloadend = async () => {
         try {
             const base64String = (reader.result as string).split(',')[1];
-            const data = await extractReceiptData(base64String);
+            // Pass the selected language code for context
+            const data = await extractReceiptData(base64String, ocrLanguage);
             
             if (!data || Object.keys(data).length === 0) {
                 alert('Could not extract data from the receipt image. Please try a clearer photo.');
@@ -257,6 +260,17 @@ export const VoucherGenerator: React.FC = () => {
     reader.readAsDataURL(file);
     // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setCompanyLogo(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
   };
 
   const applyOCRData = () => {
@@ -283,6 +297,7 @@ export const VoucherGenerator: React.FC = () => {
             setVoucherDate(extractedData.date);
             newAutoFilled.add('voucherDate');
         }
+        
         if (isEmpty(originalDate)) {
             setOriginalDate(extractedData.date); 
             newAutoFilled.add('originalDate');
@@ -303,8 +318,8 @@ export const VoucherGenerator: React.FC = () => {
         newAutoFilled.add('companyAddress');
     }
 
-    // Only apply total amount if items list is effectively empty
-    const isItemsEmpty = items.length === 0 || (items.length === 1 && !items[0].description && !items[0].amount);
+    // Overwrite total amount and items to match receipt only if items list is effectively empty
+    const isItemsEmpty = items.length === 0 || (items.length === 1 && isEmpty(items[0].description) && Number(items[0].amount) === 0);
 
     if (extractedData.totalAmount && isItemsEmpty) {
         const newItemId = Date.now().toString();
@@ -351,7 +366,7 @@ export const VoucherGenerator: React.FC = () => {
     setShowConfirmDialog(true);
   };
 
-  const executeSaveVoucher = async () => {
+  const executeSaveVoucher = async (status: 'DRAFT' | 'COMPLETED' = 'COMPLETED') => {
     setShowConfirmDialog(false);
     setSaving(true);
 
@@ -361,7 +376,8 @@ export const VoucherGenerator: React.FC = () => {
         company: {
             name: companyName,
             registration_no: companyRegNo,
-            address: companyAddress
+            address: companyAddress,
+            logo: companyLogo
         },
         payee: {
             name: payee,
@@ -383,7 +399,8 @@ export const VoucherGenerator: React.FC = () => {
             reason: lostReason,
             evidence_type: evidenceType,
             evidence_ref: evidenceRef
-        }
+        },
+        status: status
     };
 
     try {
@@ -396,13 +413,13 @@ export const VoucherGenerator: React.FC = () => {
         });
 
         if (response.ok) {
-            alert("Voucher saved successfully!");
+            alert(`Voucher ${status.toLowerCase()} saved successfully!`);
             // Optional: Redirect or clear form
         } else {
             console.warn("Backend API not reachable. Mocking success.");
             // Slight delay to simulate network
             await new Promise(resolve => setTimeout(resolve, 1000));
-            alert(`Voucher saved (Simulation). Data logged to console.`);
+            alert(`Voucher saved as ${status}. Data logged to console.`);
             console.log("Submitted Payload:", payload);
         }
     } catch (error) {
@@ -420,7 +437,21 @@ export const VoucherGenerator: React.FC = () => {
             <h2 className="text-2xl font-bold text-gray-700">New Cash Voucher</h2>
             <p className="text-sm text-gray-500">Generate a new payment voucher with AI assistance</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+            {/* Language Selector for OCR */}
+            <div className="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl border border-white/60" title="Select Receipt Language">
+                <Languages size={16} className="text-gray-400" />
+                <NeuroSelect 
+                    value={ocrLanguage} 
+                    onChange={(e) => setOcrLanguage(e.target.value)}
+                    className="!py-1 !px-2 !text-xs !bg-transparent !shadow-none !border-none focus:!ring-0 w-24 md:w-32"
+                >
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.label}</option>
+                    ))}
+                </NeuroSelect>
+            </div>
+
             <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -444,6 +475,32 @@ export const VoucherGenerator: React.FC = () => {
         <div className="xl:col-span-1 h-full">
             <NeuroCard title="Company Information" className="h-full">
                 <div className="space-y-4">
+                    {/* Logo Section */}
+                    <div className="flex flex-col items-center justify-center mb-6">
+                         <div className="relative w-24 h-24 group cursor-pointer">
+                            <div className={`w-full h-full rounded-2xl overflow-hidden flex items-center justify-center border-2 border-dashed border-gray-300 bg-gray-50/50 transition-all ${companyLogo ? 'border-purple-200' : 'hover:border-purple-300'}`}>
+                                {companyLogo ? (
+                                    <img src={companyLogo} alt="Company Logo" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="text-center text-gray-400 p-2">
+                                        <ImageIcon size={24} className="mx-auto mb-1 opacity-50" />
+                                        <span className="text-[10px] uppercase font-bold tracking-wider">Logo</span>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Hover Overlay */}
+                            <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-xs backdrop-blur-[1px]">
+                                 <span className="text-xs font-medium">Change</span>
+                            </div>
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={handleLogoUpload}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                            />
+                         </div>
+                    </div>
+
                     <div className="relative">
                         <label className="block text-sm text-gray-500 mb-2 flex items-center gap-2">
                             <Building2 size={14} /> Company Name
@@ -682,14 +739,25 @@ export const VoucherGenerator: React.FC = () => {
                         {loadingAI ? 'Generating...' : 'AI Check Description'}
                     </NeuroButton>
 
-                    <NeuroButton 
-                        onClick={handleSaveClick} 
-                        disabled={saving} 
-                        className="w-full text-blue-600 font-bold text-lg py-4 flex items-center justify-center gap-2"
-                    >
-                        {saving ? <Sparkles size={20} className="animate-spin" /> : <Save size={20} />}
-                        {saving ? 'Saving...' : 'Save Voucher'}
-                    </NeuroButton>
+                    <div className="flex gap-3">
+                        <NeuroButton 
+                            onClick={() => executeSaveVoucher('DRAFT')} 
+                            disabled={saving} 
+                            className="flex-1 text-gray-600 font-bold text-sm py-3 flex items-center justify-center gap-2"
+                        >
+                            <FileText size={18} />
+                            Draft
+                        </NeuroButton>
+
+                        <NeuroButton 
+                            onClick={handleSaveClick} 
+                            disabled={saving} 
+                            className="flex-1 text-blue-600 font-bold text-sm py-3 flex items-center justify-center gap-2"
+                        >
+                            {saving ? <Sparkles size={18} className="animate-spin" /> : <Save size={18} />}
+                            {saving ? '...' : 'Save'}
+                        </NeuroButton>
+                    </div>
                 </div>
             </NeuroCard>
         </div>
@@ -772,14 +840,28 @@ export const VoucherGenerator: React.FC = () => {
                             <span className="text-gray-500">Total Amount</span> 
                             <span className="font-bold text-purple-600">{extractedData.totalAmount ? `RM ${extractedData.totalAmount.toFixed(2)}` : "Not Found"}</span>
                         </div>
-                         {extractedData.companyName && (
-                             <div className="flex justify-between border-b border-gray-300/50 pb-2">
-                                <span className="text-gray-500">Bill To</span> 
-                                <span className="font-semibold text-gray-700 text-right truncate max-w-[150px]">{extractedData.companyName}</span>
+                        
+                        {/* Company Details */}
+                        {(extractedData.companyName || extractedData.companyRegNo) && (
+                            <div className="flex flex-col border-b border-gray-300/50 pb-2">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Bill To</span> 
+                                    <span className="font-semibold text-gray-700 text-right truncate max-w-[200px]">{extractedData.companyName || '-'}</span>
+                                </div>
+                                {extractedData.companyRegNo && (
+                                    <span className="text-xs text-gray-400 text-right mt-1 block">Reg: {extractedData.companyRegNo}</span>
+                                )}
                             </div>
-                         )}
+                        )}
+                        
+                        {extractedData.companyAddress && (
+                            <div className="flex flex-col border-b border-gray-300/50 pb-2">
+                                <span className="text-gray-500 mb-1">Company Address</span> 
+                                <span className="text-xs text-gray-600 text-right leading-relaxed bg-white/50 p-2 rounded-lg border border-gray-200/50">{extractedData.companyAddress}</span>
+                            </div>
+                        )}
                     </div>
-                    <p className="text-xs text-center text-gray-400">Applying this will overwrite your current form fields.</p>
+                    <p className="text-xs text-center text-gray-400">Applying this will fill empty fields only. Existing data will be preserved.</p>
                 </div>
                 
                 <div className="flex gap-4 justify-end">
@@ -867,7 +949,7 @@ export const VoucherGenerator: React.FC = () => {
                 
                 <div className="flex gap-4 justify-end">
                     <NeuroButton onClick={() => setShowConfirmDialog(false)} className="text-sm px-6">Cancel</NeuroButton>
-                    <NeuroButton onClick={executeSaveVoucher} className="text-sm text-blue-600 font-bold px-6">Confirm Save</NeuroButton>
+                    <NeuroButton onClick={() => executeSaveVoucher('COMPLETED')} className="text-sm text-blue-600 font-bold px-6">Confirm Save</NeuroButton>
                 </div>
             </NeuroCard>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { NeuroCard, NeuroInput, NeuroButton, NeuroBadge } from '../components/NeuroComponents';
 import { generateFastSummary, generateSpeech, extractReceiptData } from '../services/geminiService';
-import { Sparkles, Play, Plus, Trash2, Save, Camera, Upload } from 'lucide-react';
+import { Sparkles, Play, Plus, Trash2, Save, Upload } from 'lucide-react';
 import { VoucherItem } from '../types';
 
 export const VoucherGenerator: React.FC = () => {
@@ -65,22 +65,29 @@ export const VoucherGenerator: React.FC = () => {
     setScanning(true);
     const reader = new FileReader();
     reader.onloadend = async () => {
-        const base64String = (reader.result as string).split(',')[1];
-        const data = await extractReceiptData(base64String);
-        if (data) {
-            if (data.payeeName) setPayee(data.payeeName);
-            if (data.date) setDate(data.date);
-            if (data.totalAmount) {
-                setItems([{
-                    id: Date.now().toString(),
-                    description: 'Receipt Import',
-                    amount: data.totalAmount
-                }]);
+        try {
+            const base64String = (reader.result as string).split(',')[1];
+            const data = await extractReceiptData(base64String);
+            
+            if (data) {
+                if (data.payeeName) setPayee(data.payeeName);
+                if (data.date) setDate(data.date);
+                if (data.totalAmount) {
+                    setItems([{
+                        id: Date.now().toString(),
+                        description: 'Receipt Import',
+                        amount: data.totalAmount
+                    }]);
+                }
+            } else {
+                alert('Could not extract data from the receipt image. Please try a clearer photo.');
             }
-        } else {
-            alert('Could not extract data from receipt.');
+        } catch (error) {
+            console.error(error);
+            alert('Error processing receipt.');
+        } finally {
+            setScanning(false);
         }
-        setScanning(false);
     };
     reader.readAsDataURL(file);
     // Reset input
@@ -96,12 +103,12 @@ export const VoucherGenerator: React.FC = () => {
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept="image/*" 
+                accept="image/png, image/jpeg, image/webp" 
                 onChange={handleReceiptScan} 
             />
             <NeuroButton onClick={() => fileInputRef.current?.click()} disabled={scanning} className="flex items-center gap-2 text-sm">
-                <Camera size={16} className={scanning ? "animate-pulse text-red-500" : "text-purple-600"} />
-                {scanning ? 'Scanning...' : 'Scan Receipt'}
+                <Upload size={16} className={scanning ? "animate-bounce text-blue-500" : "text-purple-600"} />
+                {scanning ? 'Analyzing Receipt...' : 'Upload Receipt'}
             </NeuroButton>
             <NeuroButton onClick={handleAISummary} disabled={loadingAI} className="flex items-center gap-2 text-sm">
                 <Sparkles size={16} className={loadingAI ? "animate-spin" : "text-yellow-500"} />

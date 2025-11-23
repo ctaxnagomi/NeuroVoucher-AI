@@ -120,7 +120,7 @@ export const extractReceiptData = async (base64Image: string): Promise<{ payeeNa
               mimeType: 'image/jpeg'
             }
           },
-          { text: "Extract the Payee Name, Date (YYYY-MM-DD), and Total Amount from this receipt image." }
+          { text: "Analyze this receipt image. Extract the Payee Name (merchant), Date (YYYY-MM-DD), and Total Amount (numeric). Ensure the total amount includes taxes if applicable." }
         ]
       },
       config: {

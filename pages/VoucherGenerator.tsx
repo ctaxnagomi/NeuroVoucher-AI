@@ -15,6 +15,12 @@ export const VoucherGenerator: React.FC = () => {
   const [companyRegNo, setCompanyRegNo] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
 
+  // Lost Receipt Details
+  const [originalDate, setOriginalDate] = useState('');
+  const [lostReason, setLostReason] = useState('');
+  const [evidenceType, setEvidenceType] = useState('');
+  const [evidenceRef, setEvidenceRef] = useState('');
+
   const [items, setItems] = useState<VoucherItem[]>([
     { id: '1', description: '', amount: 0 }
   ]);
@@ -82,7 +88,10 @@ export const VoucherGenerator: React.FC = () => {
                 // Pre-fill Payee
                 if (data.payeeName) setPayee(data.payeeName);
                 if (data.payeeId) setPayeeIc(data.payeeId);
-                if (data.date) setDate(data.date);
+                if (data.date) {
+                    setDate(data.date);
+                    setOriginalDate(data.date); // Assumption: Receipt date is the original date
+                }
                 
                 // Pre-fill Company (if 'Bill To' detected)
                 if (data.companyName) setCompanyName(data.companyName);
@@ -141,11 +150,11 @@ export const VoucherGenerator: React.FC = () => {
             approved_by: "",
             designation: ""
         },
-        lost_receipt: { // Defaults for schema compliance if needed
-            original_date: date,
-            reason: "",
-            evidence_type: "None",
-            evidence_ref: ""
+        lost_receipt: {
+            original_date: originalDate || date,
+            reason: lostReason,
+            evidence_type: evidenceType,
+            evidence_ref: evidenceRef
         }
     };
 
@@ -257,6 +266,40 @@ export const VoucherGenerator: React.FC = () => {
             </div>
         </NeuroCard>
       </div>
+
+      <NeuroCard title="Lost Receipt Declaration (Optional)">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               <div>
+                    <label className="block text-sm text-gray-500 mb-2">Original Expense Date</label>
+                    <NeuroInput type="date" value={originalDate} onChange={(e) => setOriginalDate(e.target.value)} />
+               </div>
+               <div>
+                    <label className="block text-sm text-gray-500 mb-2">Evidence Type</label>
+                    <NeuroInput 
+                        placeholder="e.g., Bank Statement" 
+                        value={evidenceType}
+                        onChange={(e) => setEvidenceType(e.target.value)}
+                    />
+               </div>
+               <div>
+                    <label className="block text-sm text-gray-500 mb-2">Evidence Reference</label>
+                    <NeuroInput 
+                        placeholder="e.g., TRX-123456" 
+                        value={evidenceRef}
+                        onChange={(e) => setEvidenceRef(e.target.value)}
+                    />
+               </div>
+               <div className="md:col-span-2 lg:col-span-3">
+                    <label className="block text-sm text-gray-500 mb-2">Reason for Lost Receipt</label>
+                    <NeuroTextarea 
+                        placeholder="Brief explanation for why the original receipt is missing..." 
+                        value={lostReason}
+                        onChange={(e) => setLostReason(e.target.value)}
+                        rows={2}
+                    />
+               </div>
+          </div>
+      </NeuroCard>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">

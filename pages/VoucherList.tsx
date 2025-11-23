@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NeuroCard, NeuroButton, NeuroBadge } from '../components/NeuroComponents';
-import { ChevronLeft, ChevronRight, Eye, Download, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Download, Search, FileSpreadsheet } from 'lucide-react';
+import { generateVouchersExcel } from '../lib/export/excel-generator';
 
 interface VoucherSummary {
   id: string;
@@ -11,47 +12,49 @@ interface VoucherSummary {
   created_at: string;
 }
 
+// Mock Data Source for Demo Purposes
+const MOCK_DB_VOUCHERS = [
+  { id: '1', voucher_no: 'PV-2024-001', payee_name: 'Ali Bin Abu', total_amount: 150.00, status: 'DRAFT', created_at: new Date().toISOString() },
+  { id: '2', voucher_no: 'PV-2024-002', payee_name: 'Tech Store Sdn Bhd', total_amount: 2499.00, status: 'COMPLETED', created_at: new Date(Date.now() - 86400000).toISOString() },
+  { id: '3', voucher_no: 'PV-2024-003', payee_name: 'Grab Ride', total_amount: 45.50, status: 'DRAFT', created_at: new Date(Date.now() - 172800000).toISOString() },
+  { id: '4', voucher_no: 'PV-2024-004', payee_name: 'Office Supplies Co', total_amount: 320.75, status: 'APPROVED', created_at: new Date(Date.now() - 250000000).toISOString() },
+  { id: '5', voucher_no: 'PV-2024-005', payee_name: 'Tenaga Nasional', total_amount: 543.20, status: 'PAID', created_at: new Date(Date.now() - 400000000).toISOString() },
+  { id: '6', voucher_no: 'PV-2024-006', payee_name: 'Kedai Kopi Satu', total_amount: 12.50, status: 'COMPLETED', created_at: new Date(Date.now() - 500000000).toISOString() },
+  { id: '7', voucher_no: 'PV-2024-007', payee_name: 'RapidKL', total_amount: 5.00, status: 'DRAFT', created_at: new Date(Date.now() - 600000000).toISOString() },
+];
+
 export const VoucherList: React.FC = () => {
   const [vouchers, setVouchers] = useState<VoucherSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const fetchVouchers = async (pageNum: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/vouchers?page=${pageNum}&limit=10&search=${searchTerm}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-            // Mapping API response to match interface if needed
-            const mappedVouchers = data.data.vouchers.map((v: any) => ({
-                id: v.id,
-                voucher_no: v.voucher_no || v.voucherNo,
-                payee_name: v.payee?.name || v.payee_name || 'Unknown',
-                total_amount: v.total_amount || v.totalAmount,
-                status: v.status,
-                created_at: v.created_at || v.createdAt
-            }));
-            setVouchers(mappedVouchers);
-            setTotalPages(data.data.pagination.total_pages);
-        }
-      } else {
-        throw new Error("Failed to fetch");
-      }
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      // Filter mock data based on search
+      const filtered = MOCK_DB_VOUCHERS.filter(v => 
+        v.payee_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        v.voucher_no.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      // Pagination logic
+      const limit = 5;
+      const total = filtered.length;
+      const start = (pageNum - 1) * limit;
+      const paginatedData = filtered.slice(start, start + limit);
+
+      setVouchers(paginatedData);
+      setTotalPages(Math.ceil(total / limit));
+      
     } catch (e) {
-      console.warn("API unavailable, using mock data");
-      // Mock data for demonstration
-      const mockData = [
-        { id: '1', voucher_no: 'PV-2024-001', payee_name: 'Ali Bin Abu', total_amount: 150.00, status: 'DRAFT', created_at: new Date().toISOString() },
-        { id: '2', voucher_no: 'PV-2024-002', payee_name: 'Tech Store Sdn Bhd', total_amount: 2499.00, status: 'COMPLETED', created_at: new Date(Date.now() - 86400000).toISOString() },
-        { id: '3', voucher_no: 'PV-2024-003', payee_name: 'Grab Ride', total_amount: 45.50, status: 'DRAFT', created_at: new Date(Date.now() - 172800000).toISOString() },
-        { id: '4', voucher_no: 'PV-2024-004', payee_name: 'Office Supplies Co', total_amount: 320.75, status: 'APPROVED', created_at: new Date(Date.now() - 250000000).toISOString() },
-        { id: '5', voucher_no: 'PV-2024-005', payee_name: 'Tenaga Nasional', total_amount: 543.20, status: 'PAID', created_at: new Date(Date.now() - 400000000).toISOString() },
-      ];
-      setVouchers(mockData);
-      setTotalPages(1);
+      console.warn("Error fetching vouchers", e);
+      setVouchers([]);
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,42 @@ export const VoucherList: React.FC = () => {
 
   useEffect(() => {
     fetchVouchers(page);
-  }, [page]);
+  }, [page, searchTerm]);
+
+  const handleExportAll = async () => {
+    setExporting(true);
+    try {
+        // Simulate "API Endpoint" /api/vouchers/export-all
+        // In a real app, we would fetch('/api/vouchers/export-all') which returns a blob.
+        // Here, we simulate fetching all data from the database and generating the Excel file.
+        
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate generation delay
+
+        // "Fetch" all data
+        const allData = MOCK_DB_VOUCHERS; 
+
+        // Generate Excel Blob
+        const blob = generateVouchersExcel(allData);
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vouchers_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+    } catch (error) {
+        console.error("Export failed:", error);
+        alert("Failed to export vouchers.");
+    } finally {
+        setExporting(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-MY', {
@@ -87,15 +125,25 @@ export const VoucherList: React.FC = () => {
     <div className="space-y-6">
        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-700">Voucher History</h2>
-        <div className="relative w-full md:w-64">
-             <input 
-                type="text" 
-                placeholder="Search vouchers..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#e0e5ec] shadow-[inset_4px_4px_8px_rgba(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.5)] outline-none text-gray-700"
-             />
-             <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+             <div className="relative flex-1 md:w-64">
+                <input 
+                    type="text" 
+                    placeholder="Search vouchers..." 
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#e0e5ec] shadow-[inset_4px_4px_8px_rgba(163,177,198,0.6),inset_-4px_-4px_8px_rgba(255,255,255,0.5)] outline-none text-gray-700"
+                />
+                <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+             </div>
+             <NeuroButton 
+                onClick={handleExportAll} 
+                disabled={exporting || loading}
+                className="flex items-center justify-center gap-2 text-green-700 !py-2"
+             >
+                <FileSpreadsheet size={18} className={exporting ? "animate-pulse" : ""} />
+                {exporting ? "Exporting..." : "Export All"}
+             </NeuroButton>
         </div>
       </div>
 

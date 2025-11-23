@@ -8,8 +8,9 @@ export const VoucherGenerator: React.FC = () => {
   // Voucher / Payee Details
   const [payee, setPayee] = useState('');
   const [payeeIc, setPayeeIc] = useState('');
-  const [date, setDate] = useState('');
+  const [voucherDate, setVoucherDate] = useState('');
   const [voucherNo, setVoucherNo] = useState('');
+  const [description, setDescription] = useState('');
   
   // Company Details (Issuer/Bill-To)
   const [companyName, setCompanyName] = useState('');
@@ -26,7 +27,6 @@ export const VoucherGenerator: React.FC = () => {
     { id: '1', description: '', amount: 0 }
   ]);
   const [loadingAI, setLoadingAI] = useState(false);
-  const [aiSummary, setAiSummary] = useState('');
   const [scanning, setScanning] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,12 +54,11 @@ export const VoucherGenerator: React.FC = () => {
     }
     
     setLoadingAI(true);
-    setAiSummary('');
     
     const prompt = `Summarize these expense items for a formal payment voucher description. Keep it under 15 words. Items: ${validItems.map(i => i.description).join(', ')}`;
     const summary = await generateFastSummary(prompt);
     
-    setAiSummary(summary);
+    setDescription(summary);
     setLoadingAI(false);
   };
 
@@ -91,12 +90,12 @@ export const VoucherGenerator: React.FC = () => {
             const base64String = (reader.result as string).split(',')[1];
             const data = await extractReceiptData(base64String);
             
-            if (data) {
+            if (data && Object.keys(data).length > 0) {
                 // Pre-fill Payee
                 if (data.payeeName) setPayee(data.payeeName);
                 if (data.payeeId) setPayeeIc(data.payeeId);
                 if (data.date) {
-                    setDate(data.date);
+                    setVoucherDate(data.date);
                     setOriginalDate(data.date); // Assumption: Receipt date is the original date
                 }
                 
@@ -128,7 +127,7 @@ export const VoucherGenerator: React.FC = () => {
   };
 
   const handleSaveVoucher = async () => {
-    if (!payee || !date || items.length === 0) {
+    if (!payee || !voucherDate || items.length === 0) {
         alert("Please ensure Payee, Date, and at least one Item are filled.");
         return;
     }
@@ -137,7 +136,7 @@ export const VoucherGenerator: React.FC = () => {
 
     const payload = {
         voucher_no: voucherNo || `PV-${Date.now()}`,
-        voucher_date: date,
+        voucher_date: voucherDate,
         company: {
             name: companyName,
             registration_no: companyRegNo,
@@ -148,7 +147,7 @@ export const VoucherGenerator: React.FC = () => {
             ic_no: payeeIc
         },
         category: "General Expense",
-        description: aiSummary || "General Expenses",
+        description: description || "General Expenses",
         items: items.map(item => ({
             description: item.description,
             amount: Number(item.amount)
@@ -159,7 +158,7 @@ export const VoucherGenerator: React.FC = () => {
             designation: ""
         },
         lost_receipt: {
-            original_date: originalDate || date,
+            original_date: originalDate || voucherDate,
             reason: lostReason,
             evidence_type: evidenceType,
             evidence_ref: evidenceRef
@@ -261,9 +260,19 @@ export const VoucherGenerator: React.FC = () => {
                          />
                     </div>
                     <div>
-                         <label className="block text-sm text-gray-500 mb-2">Date</label>
-                         <NeuroInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                         <label className="block text-sm text-gray-500 mb-2">Voucher Date</label>
+                         <NeuroInput type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} />
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm text-gray-500 mb-2">Description</label>
+                    <NeuroTextarea 
+                        value={description} 
+                        onChange={(e) => setDescription(e.target.value)} 
+                        placeholder="e.g., Payment for office supplies and refreshments" 
+                        rows={2}
+                    />
                 </div>
 
                 <div>
@@ -323,19 +332,6 @@ export const VoucherGenerator: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
             <NeuroCard title="Line Items">
-                {aiSummary && (
-                    <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 px-4 py-3 rounded-xl relative mb-4 flex items-start gap-3 shadow-[inset_2px_2px_4px_rgba(163,177,198,0.2)]">
-                        <Sparkles size={18} className="mt-0.5 flex-shrink-0 text-yellow-500" />
-                        <div className="flex-1">
-                            <p className="font-bold text-xs uppercase tracking-wider text-blue-400 mb-1">AI Suggestion</p>
-                            <p className="text-sm font-medium">{aiSummary}</p>
-                        </div>
-                        <button onClick={() => setAiSummary('')} className="text-blue-400 hover:text-blue-600">
-                            <X size={16} />
-                        </button>
-                    </div>
-                )}
-
                 <div className="space-y-4">
                     {items.map((item, index) => (
                         <div key={item.id} className="flex gap-4 items-start">

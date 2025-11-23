@@ -171,7 +171,7 @@ export const LiveAgent: React.FC = () => {
                         <Mic size={20} /> Connect Live Agent
                     </NeuroButton>
                 ) : (
-                    <NeuroButton onClick={stopSession} variant="danger" className="flex items-center gap-2 mx-auto text-red-600">
+                    <NeuroButton onClick={stopSession} className="flex items-center gap-2 mx-auto text-red-600">
                          <MicOff size={20} /> End Session
                     </NeuroButton>
                 )}

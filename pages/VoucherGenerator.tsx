@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { NeuroCard, NeuroInput, NeuroButton, NeuroBadge } from '../components/NeuroComponents';
-import { generateFastSummary, generateSpeech } from '../services/geminiService';
-import { Sparkles, Play, Plus, Trash2, Save } from 'lucide-react';
+import { generateFastSummary, generateSpeech, extractReceiptData } from '../services/geminiService';
+import { Sparkles, Play, Plus, Trash2, Save, Camera, Upload } from 'lucide-react';
 import { VoucherItem } from '../types';
 
 export const VoucherGenerator: React.FC = () => {
   const [payee, setPayee] = useState('');
+  const [date, setDate] = useState('');
   const [items, setItems] = useState<VoucherItem[]>([
     { id: '1', description: '', amount: 0 }
   ]);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const total = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
@@ -55,11 +58,51 @@ export const VoucherGenerator: React.FC = () => {
     }
   };
 
+  const handleReceiptScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanning(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+        const base64String = (reader.result as string).split(',')[1];
+        const data = await extractReceiptData(base64String);
+        if (data) {
+            if (data.payeeName) setPayee(data.payeeName);
+            if (data.date) setDate(data.date);
+            if (data.totalAmount) {
+                setItems([{
+                    id: Date.now().toString(),
+                    description: 'Receipt Import',
+                    amount: data.totalAmount
+                }]);
+            }
+        } else {
+            alert('Could not extract data from receipt.');
+        }
+        setScanning(false);
+    };
+    reader.readAsDataURL(file);
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-700">New Cash Voucher</h2>
         <div className="flex gap-3">
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleReceiptScan} 
+            />
+            <NeuroButton onClick={() => fileInputRef.current?.click()} disabled={scanning} className="flex items-center gap-2 text-sm">
+                <Camera size={16} className={scanning ? "animate-pulse text-red-500" : "text-purple-600"} />
+                {scanning ? 'Scanning...' : 'Scan Receipt'}
+            </NeuroButton>
             <NeuroButton onClick={handleAISummary} disabled={loadingAI} className="flex items-center gap-2 text-sm">
                 <Sparkles size={16} className={loadingAI ? "animate-spin" : "text-yellow-500"} />
                 {loadingAI ? 'Thinking...' : 'AI Check'}
@@ -84,7 +127,7 @@ export const VoucherGenerator: React.FC = () => {
                 </div>
                 <div>
                      <label className="block text-sm text-gray-500 mb-2">Date</label>
-                     <NeuroInput type="date" />
+                     <NeuroInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </div>
             </div>
         </NeuroCard>

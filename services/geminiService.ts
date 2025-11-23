@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { GeminiModel } from "../types";
 import { b64ToUint8Array, decodeAudioData } from "./audioUtils";
 
@@ -104,6 +104,48 @@ export const editImage = async (base64Image: string, prompt: string): Promise<st
         console.error("Image Edit Error:", error);
         return null;
     }
+}
+
+// --- OCR / Receipt Extraction (Flash) ---
+export const extractReceiptData = async (base64Image: string): Promise<{ payeeName?: string; date?: string; totalAmount?: number } | null> => {
+  const client = getClient();
+  try {
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64Image,
+              mimeType: 'image/jpeg'
+            }
+          },
+          { text: "Extract the Payee Name, Date (YYYY-MM-DD), and Total Amount from this receipt image." }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                payeeName: { type: Type.STRING },
+                date: { type: Type.STRING },
+                totalAmount: { type: Type.NUMBER }
+            },
+            required: ["payeeName", "totalAmount"]
+        }
+      }
+    });
+
+    const jsonText = response.text;
+    if (jsonText) {
+        return JSON.parse(jsonText);
+    }
+    return null;
+  } catch (error) {
+    console.error("Receipt Extraction Error:", error);
+    return null;
+  }
 }
 
 // --- Live API Connector ---

@@ -6,6 +6,20 @@ import { Sparkles, Play, Plus, Trash2, Save, Upload, X, Calendar, FileText, Aler
 import { VoucherItem, SUPPORTED_LANGUAGES } from '../types';
 import { Modality, LiveServerMessage } from '@google/genai';
 
+// Placeholder Constants to ensure consistency between UI and Logic
+const PLACEHOLDERS = {
+    companyName: "e.g., My Tech Sdn Bhd",
+    companyRegNo: "e.g., 202301000XXX",
+    companyAddress: "Full business address...",
+    payee: "e.g., Ali Bin Abu",
+    payeeIc: "e.g., 880101-14-XXXX",
+    voucherNo: "PV-YYYY-XXXX",
+    description: "e.g., Payment for office supplies and refreshments",
+    evidenceType: "e.g., Bank Statement",
+    evidenceRef: "e.g., TRX-123456",
+    lostReason: "Brief explanation for why the original receipt is missing..."
+};
+
 const AutoFilledIndicator = () => (
     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-500 pointer-events-none animate-pulse z-10" title="Auto-filled by AI">
         <Sparkles size={16} fill="currentColor" className="opacity-70" />
@@ -279,17 +293,24 @@ export const VoucherGenerator: React.FC = () => {
     // Use existing auto-filled fields to preserve previous fills if merging
     const newAutoFilled = new Set<string>(autoFilledFields);
 
-    const isEmpty = (val: string) => !val || val.trim() === '';
+    // Refined isEmpty check: Checks for empty string OR matching placeholder value
+    const isEmpty = (val: string, placeholder?: string) => {
+        if (!val || val.trim() === '') return true;
+        if (placeholder && val.trim() === placeholder) return true;
+        return false;
+    };
+
+    const applyIfEmpty = (currentValue: string, newValue: any, fieldKey: string, setter: (val: any) => void, placeholder?: string) => {
+        // Only apply if the current value is considered empty and we have a new value
+        if (newValue && isEmpty(currentValue, placeholder)) {
+            setter(newValue);
+            newAutoFilled.add(fieldKey);
+        }
+    };
 
     // Pre-fill Payee
-    if (extractedData.payeeName && isEmpty(payee)) {
-        setPayee(extractedData.payeeName);
-        newAutoFilled.add('payee');
-    }
-    if (extractedData.payeeId && isEmpty(payeeIc)) {
-        setPayeeIc(extractedData.payeeId);
-        newAutoFilled.add('payeeIc');
-    }
+    applyIfEmpty(payee, extractedData.payeeName, 'payee', setPayee, PLACEHOLDERS.payee);
+    applyIfEmpty(payeeIc, extractedData.payeeId, 'payeeIc', setPayeeIc, PLACEHOLDERS.payeeIc);
     
     // Apply Date to both Voucher Date and Original Expense Date
     if (extractedData.date) {
@@ -305,18 +326,9 @@ export const VoucherGenerator: React.FC = () => {
     }
     
     // Pre-fill Company (if 'Bill To' detected)
-    if (extractedData.companyName && isEmpty(companyName)) {
-        setCompanyName(extractedData.companyName);
-        newAutoFilled.add('companyName');
-    }
-    if (extractedData.companyRegNo && isEmpty(companyRegNo)) {
-        setCompanyRegNo(extractedData.companyRegNo);
-        newAutoFilled.add('companyRegNo');
-    }
-    if (extractedData.companyAddress && isEmpty(companyAddress)) {
-        setCompanyAddress(extractedData.companyAddress);
-        newAutoFilled.add('companyAddress');
-    }
+    applyIfEmpty(companyName, extractedData.companyName, 'companyName', setCompanyName, PLACEHOLDERS.companyName);
+    applyIfEmpty(companyRegNo, extractedData.companyRegNo, 'companyRegNo', setCompanyRegNo, PLACEHOLDERS.companyRegNo);
+    applyIfEmpty(companyAddress, extractedData.companyAddress, 'companyAddress', setCompanyAddress, PLACEHOLDERS.companyAddress);
 
     // Overwrite total amount and items to match receipt only if items list is effectively empty
     const isItemsEmpty = items.length === 0 || (items.length === 1 && isEmpty(items[0].description) && Number(items[0].amount) === 0);
@@ -441,15 +453,17 @@ export const VoucherGenerator: React.FC = () => {
             {/* Language Selector for OCR */}
             <div className="flex items-center gap-2 bg-white/50 px-3 py-1.5 rounded-xl border border-white/60" title="Select Receipt Language">
                 <Languages size={16} className="text-gray-400" />
-                <NeuroSelect 
-                    value={ocrLanguage} 
-                    onChange={(e) => setOcrLanguage(e.target.value)}
-                    className="!py-1 !px-2 !text-xs !bg-transparent !shadow-none !border-none focus:!ring-0 w-24 md:w-32"
-                >
-                    {SUPPORTED_LANGUAGES.map(lang => (
-                        <option key={lang.code} value={lang.code}>{lang.label}</option>
-                    ))}
-                </NeuroSelect>
+                <div className="w-24 md:w-32">
+                    <NeuroSelect 
+                        value={ocrLanguage} 
+                        onChange={(e) => setOcrLanguage(e.target.value)}
+                        className="!py-1 !px-2 !text-xs !bg-transparent !shadow-none !border-none focus:!ring-0"
+                    >
+                        {SUPPORTED_LANGUAGES.map(lang => (
+                            <option key={lang.code} value={lang.code}>{lang.label}</option>
+                        ))}
+                    </NeuroSelect>
+                </div>
             </div>
 
             <input 
@@ -509,7 +523,7 @@ export const VoucherGenerator: React.FC = () => {
                             <NeuroInput 
                                 value={companyName} 
                                 onChange={(e) => { setCompanyName(e.target.value); handleFieldChange('companyName'); }}
-                                placeholder="e.g., My Tech Sdn Bhd" 
+                                placeholder={PLACEHOLDERS.companyName}
                                 className={getAutoFillClass('companyName')}
                             />
                             {autoFilledFields.has('companyName') && <AutoFilledIndicator />}
@@ -521,7 +535,7 @@ export const VoucherGenerator: React.FC = () => {
                             <NeuroInput 
                                 value={companyRegNo} 
                                 onChange={(e) => { setCompanyRegNo(e.target.value); handleFieldChange('companyRegNo'); }}
-                                placeholder="e.g., 202301000XXX" 
+                                placeholder={PLACEHOLDERS.companyRegNo}
                                 className={getAutoFillClass('companyRegNo')}
                             />
                             {autoFilledFields.has('companyRegNo') && <AutoFilledIndicator />}
@@ -534,7 +548,7 @@ export const VoucherGenerator: React.FC = () => {
                                 rows={4}
                                 value={companyAddress} 
                                 onChange={(e) => { setCompanyAddress(e.target.value); handleFieldChange('companyAddress'); }}
-                                placeholder="Full business address..." 
+                                placeholder={PLACEHOLDERS.companyAddress} 
                                 className={getAutoFillClass('companyAddress')}
                             />
                             {autoFilledFields.has('companyAddress') && <div className="absolute right-3 top-3"><Sparkles size={16} className="text-purple-500 animate-pulse opacity-70" /></div>}
@@ -555,7 +569,7 @@ export const VoucherGenerator: React.FC = () => {
                             <NeuroInput 
                                 value={voucherNo} 
                                 onChange={(e) => setVoucherNo(e.target.value)} 
-                                placeholder="PV-YYYY-XXXX" 
+                                placeholder={PLACEHOLDERS.voucherNo}
                                 className="pl-10"
                             />
                             <FileText size={18} className="absolute left-3 top-3.5 text-gray-400" />
@@ -598,7 +612,7 @@ export const VoucherGenerator: React.FC = () => {
                             <NeuroInput 
                                 value={payee} 
                                 onChange={(e) => { setPayee(e.target.value); handleFieldChange('payee'); }}
-                                placeholder="e.g., Ali Bin Abu" 
+                                placeholder={PLACEHOLDERS.payee}
                                 className={getAutoFillClass('payee')}
                             />
                             {autoFilledFields.has('payee') && <AutoFilledIndicator />}
@@ -612,7 +626,7 @@ export const VoucherGenerator: React.FC = () => {
                             <NeuroInput 
                                 value={payeeIc}
                                 onChange={(e) => { setPayeeIc(e.target.value); handleFieldChange('payeeIc'); }}
-                                placeholder="e.g., 880101-14-XXXX" 
+                                placeholder={PLACEHOLDERS.payeeIc}
                                 className={getAutoFillClass('payeeIc')}
                             />
                             {autoFilledFields.has('payeeIc') && <AutoFilledIndicator />}
@@ -661,7 +675,7 @@ export const VoucherGenerator: React.FC = () => {
                         <NeuroTextarea 
                             value={description} 
                             onChange={(e) => setDescription(e.target.value)} 
-                            placeholder="e.g., Payment for office supplies and refreshments" 
+                            placeholder={PLACEHOLDERS.description} 
                             rows={2}
                         />
                     </div>
@@ -781,7 +795,7 @@ export const VoucherGenerator: React.FC = () => {
                <div>
                     <label className="block text-sm text-gray-500 mb-2">Evidence Type</label>
                     <NeuroInput 
-                        placeholder="e.g., Bank Statement" 
+                        placeholder={PLACEHOLDERS.evidenceType}
                         value={evidenceType}
                         onChange={(e) => setEvidenceType(e.target.value)}
                     />
@@ -789,7 +803,7 @@ export const VoucherGenerator: React.FC = () => {
                <div>
                     <label className="block text-sm text-gray-500 mb-2">Evidence Reference</label>
                     <NeuroInput 
-                        placeholder="e.g., TRX-123456" 
+                        placeholder={PLACEHOLDERS.evidenceRef}
                         value={evidenceRef}
                         onChange={(e) => setEvidenceRef(e.target.value)}
                     />
@@ -797,7 +811,7 @@ export const VoucherGenerator: React.FC = () => {
                <div className="md:col-span-2 lg:col-span-3">
                     <label className="block text-sm text-gray-500 mb-2">Reason for Lost Receipt</label>
                     <NeuroTextarea 
-                        placeholder="Brief explanation for why the original receipt is missing..." 
+                        placeholder={PLACEHOLDERS.lostReason}
                         value={lostReason}
                         onChange={(e) => setLostReason(e.target.value)}
                         rows={2}
@@ -861,7 +875,7 @@ export const VoucherGenerator: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <p className="text-xs text-center text-gray-400">Applying this will fill empty fields only. Existing data will be preserved.</p>
+                    <p className="text-xs text-center text-gray-400">OCR data will only fill empty fields. Your existing entries are safe.</p>
                 </div>
                 
                 <div className="flex gap-4 justify-end">

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { NeuroCard, NeuroInput, NeuroButton, NeuroBadge, NeuroTextarea } from '../components/NeuroComponents';
 import { generateFastSummary, generateSpeech, extractReceiptData } from '../services/geminiService';
-import { Sparkles, Play, Plus, Trash2, Save, Upload } from 'lucide-react';
+import { Sparkles, Play, Plus, Trash2, Save, Upload, X } from 'lucide-react';
 import { VoucherItem } from '../types';
 
 export const VoucherGenerator: React.FC = () => {
@@ -9,6 +9,7 @@ export const VoucherGenerator: React.FC = () => {
   const [payee, setPayee] = useState('');
   const [payeeIc, setPayeeIc] = useState('');
   const [date, setDate] = useState('');
+  const [voucherNo, setVoucherNo] = useState('');
   
   // Company Details (Issuer/Bill-To)
   const [companyName, setCompanyName] = useState('');
@@ -25,6 +26,7 @@ export const VoucherGenerator: React.FC = () => {
     { id: '1', description: '', amount: 0 }
   ]);
   const [loadingAI, setLoadingAI] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
   const [scanning, setScanning] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,20 +47,25 @@ export const VoucherGenerator: React.FC = () => {
   };
 
   const handleAISummary = async () => {
-    if (items.length === 0) return;
+    const validItems = items.filter(i => i.description.trim().length > 0);
+    if (validItems.length === 0) {
+        alert("Please add item descriptions first.");
+        return;
+    }
+    
     setLoadingAI(true);
-    // Use Fast Lite for low latency summary
-    const prompt = `Summarize these expense items for a formal payment voucher description. Keep it under 15 words. Items: ${items.map(i => i.description).join(', ')}`;
+    setAiSummary('');
+    
+    const prompt = `Summarize these expense items for a formal payment voucher description. Keep it under 15 words. Items: ${validItems.map(i => i.description).join(', ')}`;
     const summary = await generateFastSummary(prompt);
     
-    // Add summary as a note or alert
-    alert(`AI Suggested Summary: ${summary}`);
+    setAiSummary(summary);
     setLoadingAI(false);
   };
 
   const handleReadAloud = async () => {
     setPlayingAudio(true);
-    const textToRead = `Voucher for ${payee}. Total amount is Ringgit Malaysia ${total.toFixed(2)}.`;
+    const textToRead = `Voucher ${voucherNo ? voucherNo : ''} for ${payee}. Total amount is Ringgit Malaysia ${total.toFixed(2)}.`;
     const audioBuffer = await generateSpeech(textToRead);
     
     if (audioBuffer) {
@@ -129,7 +136,7 @@ export const VoucherGenerator: React.FC = () => {
     setSaving(true);
 
     const payload = {
-        voucher_no: `PV-${Date.now()}`, // Auto-generate for now
+        voucher_no: voucherNo || `PV-${Date.now()}`,
         voucher_date: date,
         company: {
             name: companyName,
@@ -141,6 +148,7 @@ export const VoucherGenerator: React.FC = () => {
             ic_no: payeeIc
         },
         category: "General Expense",
+        description: aiSummary || "General Expenses",
         items: items.map(item => ({
             description: item.description,
             amount: Number(item.amount)
@@ -241,8 +249,23 @@ export const VoucherGenerator: React.FC = () => {
             </div>
         </NeuroCard>
 
-        <NeuroCard title="Payee Details">
+        <NeuroCard title="Voucher & Payee Details">
             <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                         <label className="block text-sm text-gray-500 mb-2">Voucher No.</label>
+                         <NeuroInput 
+                             value={voucherNo} 
+                             onChange={(e) => setVoucherNo(e.target.value)} 
+                             placeholder="PV-2024-001" 
+                         />
+                    </div>
+                    <div>
+                         <label className="block text-sm text-gray-500 mb-2">Date</label>
+                         <NeuroInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    </div>
+                </div>
+
                 <div>
                     <label className="block text-sm text-gray-500 mb-2">Payee Name</label>
                     <NeuroInput 
@@ -258,10 +281,6 @@ export const VoucherGenerator: React.FC = () => {
                         onChange={(e) => setPayeeIc(e.target.value)}
                         placeholder="e.g., 880101-14-XXXX" 
                     />
-                </div>
-                <div>
-                     <label className="block text-sm text-gray-500 mb-2">Date</label>
-                     <NeuroInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </div>
             </div>
         </NeuroCard>
@@ -304,6 +323,19 @@ export const VoucherGenerator: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
             <NeuroCard title="Line Items">
+                {aiSummary && (
+                    <div className="bg-blue-50/50 border border-blue-200/50 text-blue-800 px-4 py-3 rounded-xl relative mb-4 flex items-start gap-3 shadow-[inset_2px_2px_4px_rgba(163,177,198,0.2)]">
+                        <Sparkles size={18} className="mt-0.5 flex-shrink-0 text-yellow-500" />
+                        <div className="flex-1">
+                            <p className="font-bold text-xs uppercase tracking-wider text-blue-400 mb-1">AI Suggestion</p>
+                            <p className="text-sm font-medium">{aiSummary}</p>
+                        </div>
+                        <button onClick={() => setAiSummary('')} className="text-blue-400 hover:text-blue-600">
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
+
                 <div className="space-y-4">
                     {items.map((item, index) => (
                         <div key={item.id} className="flex gap-4 items-start">

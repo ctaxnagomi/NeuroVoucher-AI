@@ -128,14 +128,17 @@ export const extractReceiptData = async (base64Image: string): Promise<{
               mimeType: 'image/jpeg'
             }
           },
-          { text: `Analyze this receipt image. Extract the following details:
-            1. Payee Name (The merchant or vendor name).
-            2. Payee ID (The merchant's registration number, SSM, or business ID).
-            3. Date (YYYY-MM-DD).
-            4. Total Amount (Numeric, including tax).
-            5. Company Name (The 'Bill To' customer name if present).
-            6. Company Registration No (The 'Bill To' registration number if present).
-            7. Company Address (The 'Bill To' address if present).` 
+          { text: `Analyze this receipt image and extract the following details into a structured JSON format.
+
+            1. **Payee Name**: The merchant or shop name. Look at the top header or logo.
+            2. **Payee ID**: Business registration number (e.g., SSM, ROC, ROB, GST ID).
+            3. **Date**: The transaction date. Standardize to YYYY-MM-DD. Handle formats like 'DD/MM/YYYY', 'DD-MMM-YYYY'.
+            4. **Total Amount**: The final total paid (numeric). Ignore currency prefixes like 'RM', 'MYR'. Use the 'Grand Total' or 'Net Total'.
+            5. **Company Name**: The 'Bill To' customer name (common in tax invoices).
+            6. **Company Registration No**: The 'Bill To' registration number.
+            7. **Company Address**: The 'Bill To' address.
+
+            If a field is ambiguous or missing, exclude it or return null. Focus on high precision for Payee Name, Date, and Total Amount.` 
           }
         ]
       },
@@ -144,13 +147,13 @@ export const extractReceiptData = async (base64Image: string): Promise<{
         responseSchema: {
             type: Type.OBJECT,
             properties: {
-                payeeName: { type: Type.STRING },
-                payeeId: { type: Type.STRING },
-                date: { type: Type.STRING },
-                totalAmount: { type: Type.NUMBER },
-                companyName: { type: Type.STRING },
-                companyRegNo: { type: Type.STRING },
-                companyAddress: { type: Type.STRING }
+                payeeName: { type: Type.STRING, description: "Name of the merchant/payee" },
+                payeeId: { type: Type.STRING, description: "Merchant registration ID" },
+                date: { type: Type.STRING, description: "Transaction date formatted as YYYY-MM-DD" },
+                totalAmount: { type: Type.NUMBER, description: "Total amount paid (numeric)" },
+                companyName: { type: Type.STRING, description: "Bill-to company name" },
+                companyRegNo: { type: Type.STRING, description: "Bill-to company registration no" },
+                companyAddress: { type: Type.STRING, description: "Bill-to company address" }
             },
             required: ["payeeName", "totalAmount"]
         }

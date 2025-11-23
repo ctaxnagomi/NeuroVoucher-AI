@@ -107,6 +107,9 @@ export const VoucherGenerator: React.FC = () => {
     }
   };
 
+  const getAutoFillClass = (field: string) => 
+    autoFilledFields.has(field) ? "ring-2 ring-purple-400/40 bg-purple-50/10 transition-all duration-500" : "";
+
   const addItem = () => {
     setItems([...items, { id: Date.now().toString(), description: '', amount: 0 }]);
   };
@@ -259,41 +262,51 @@ export const VoucherGenerator: React.FC = () => {
   const applyOCRData = () => {
     if (!extractedData) return;
 
-    const newAutoFilled = new Set<string>();
+    // Use existing auto-filled fields to preserve previous fills if merging
+    const newAutoFilled = new Set<string>(autoFilledFields);
+
+    const isEmpty = (val: string) => !val || val.trim() === '';
 
     // Pre-fill Payee
-    if (extractedData.payeeName) {
+    if (extractedData.payeeName && isEmpty(payee)) {
         setPayee(extractedData.payeeName);
         newAutoFilled.add('payee');
     }
-    if (extractedData.payeeId) {
+    if (extractedData.payeeId && isEmpty(payeeIc)) {
         setPayeeIc(extractedData.payeeId);
         newAutoFilled.add('payeeIc');
     }
     
     // Apply Date to both Voucher Date and Original Expense Date
     if (extractedData.date) {
-        setVoucherDate(extractedData.date);
-        setOriginalDate(extractedData.date); 
-        newAutoFilled.add('voucherDate');
-        newAutoFilled.add('originalDate');
+        if (isEmpty(voucherDate)) {
+            setVoucherDate(extractedData.date);
+            newAutoFilled.add('voucherDate');
+        }
+        if (isEmpty(originalDate)) {
+            setOriginalDate(extractedData.date); 
+            newAutoFilled.add('originalDate');
+        }
     }
     
     // Pre-fill Company (if 'Bill To' detected)
-    if (extractedData.companyName) {
+    if (extractedData.companyName && isEmpty(companyName)) {
         setCompanyName(extractedData.companyName);
         newAutoFilled.add('companyName');
     }
-    if (extractedData.companyRegNo) {
+    if (extractedData.companyRegNo && isEmpty(companyRegNo)) {
         setCompanyRegNo(extractedData.companyRegNo);
         newAutoFilled.add('companyRegNo');
     }
-    if (extractedData.companyAddress) {
+    if (extractedData.companyAddress && isEmpty(companyAddress)) {
         setCompanyAddress(extractedData.companyAddress);
         newAutoFilled.add('companyAddress');
     }
 
-    if (extractedData.totalAmount) {
+    // Only apply total amount if items list is effectively empty
+    const isItemsEmpty = items.length === 0 || (items.length === 1 && !items[0].description && !items[0].amount);
+
+    if (extractedData.totalAmount && isItemsEmpty) {
         const newItemId = Date.now().toString();
         setItems([{
             id: newItemId,
@@ -440,6 +453,7 @@ export const VoucherGenerator: React.FC = () => {
                                 value={companyName} 
                                 onChange={(e) => { setCompanyName(e.target.value); handleFieldChange('companyName'); }}
                                 placeholder="e.g., My Tech Sdn Bhd" 
+                                className={getAutoFillClass('companyName')}
                             />
                             {autoFilledFields.has('companyName') && <AutoFilledIndicator />}
                         </div>
@@ -451,6 +465,7 @@ export const VoucherGenerator: React.FC = () => {
                                 value={companyRegNo} 
                                 onChange={(e) => { setCompanyRegNo(e.target.value); handleFieldChange('companyRegNo'); }}
                                 placeholder="e.g., 202301000XXX" 
+                                className={getAutoFillClass('companyRegNo')}
                             />
                             {autoFilledFields.has('companyRegNo') && <AutoFilledIndicator />}
                         </div>
@@ -463,6 +478,7 @@ export const VoucherGenerator: React.FC = () => {
                                 value={companyAddress} 
                                 onChange={(e) => { setCompanyAddress(e.target.value); handleFieldChange('companyAddress'); }}
                                 placeholder="Full business address..." 
+                                className={getAutoFillClass('companyAddress')}
                             />
                             {autoFilledFields.has('companyAddress') && <div className="absolute right-3 top-3"><Sparkles size={16} className="text-purple-500 animate-pulse opacity-70" /></div>}
                         </div>
@@ -495,7 +511,7 @@ export const VoucherGenerator: React.FC = () => {
                                 type="date" 
                                 value={voucherDate} 
                                 onChange={(e) => { setVoucherDate(e.target.value); handleFieldChange('voucherDate'); }}
-                                className="pl-10"
+                                className={`pl-10 ${getAutoFillClass('voucherDate')}`}
                             />
                             <Calendar size={18} className="absolute left-3 top-3.5 text-gray-400" />
                             {autoFilledFields.has('voucherDate') && <AutoFilledIndicator />}
@@ -526,6 +542,7 @@ export const VoucherGenerator: React.FC = () => {
                                 value={payee} 
                                 onChange={(e) => { setPayee(e.target.value); handleFieldChange('payee'); }}
                                 placeholder="e.g., Ali Bin Abu" 
+                                className={getAutoFillClass('payee')}
                             />
                             {autoFilledFields.has('payee') && <AutoFilledIndicator />}
                         </div>
@@ -539,6 +556,7 @@ export const VoucherGenerator: React.FC = () => {
                                 value={payeeIc}
                                 onChange={(e) => { setPayeeIc(e.target.value); handleFieldChange('payeeIc'); }}
                                 placeholder="e.g., 880101-14-XXXX" 
+                                className={getAutoFillClass('payeeIc')}
                             />
                             {autoFilledFields.has('payeeIc') && <AutoFilledIndicator />}
                         </div>
@@ -616,7 +634,7 @@ export const VoucherGenerator: React.FC = () => {
                                     placeholder="0.00" 
                                     value={item.amount}
                                     onChange={(e) => updateItem(item.id, 'amount', e.target.value)}
-                                    className="text-right"
+                                    className={`text-right ${getAutoFillClass(`item-${item.id}-amount`)}`}
                                 />
                                 {autoFilledFields.has(`item-${item.id}-amount`) && (
                                     <div className="absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -654,7 +672,16 @@ export const VoucherGenerator: React.FC = () => {
                     <NeuroBadge color="text-blue-600 bg-blue-100/50 px-4 py-1">Draft</NeuroBadge>
                 </div>
                 
-                <div className="pt-6 border-t border-gray-200/50">
+                <div className="pt-6 border-t border-gray-200/50 space-y-4">
+                    <NeuroButton 
+                        onClick={handleAISummary} 
+                        disabled={loadingAI} 
+                        className="w-full text-purple-600 text-sm py-3 flex items-center justify-center gap-2"
+                    >
+                        <Sparkles size={16} className={loadingAI ? "animate-spin" : ""} />
+                        {loadingAI ? 'Generating...' : 'AI Check Description'}
+                    </NeuroButton>
+
                     <NeuroButton 
                         onClick={handleSaveClick} 
                         disabled={saving} 
@@ -674,7 +701,12 @@ export const VoucherGenerator: React.FC = () => {
                <div>
                     <label className="block text-sm text-gray-500 mb-2">Original Expense Date</label>
                     <div className="relative">
-                        <NeuroInput type="date" value={originalDate} onChange={(e) => { setOriginalDate(e.target.value); handleFieldChange('originalDate'); }} />
+                        <NeuroInput 
+                            type="date" 
+                            value={originalDate} 
+                            onChange={(e) => { setOriginalDate(e.target.value); handleFieldChange('originalDate'); }} 
+                            className={getAutoFillClass('originalDate')}
+                        />
                         {autoFilledFields.has('originalDate') && <AutoFilledIndicator />}
                     </div>
                </div>

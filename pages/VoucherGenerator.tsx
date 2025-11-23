@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { NeuroCard, NeuroInput, NeuroButton, NeuroBadge, NeuroTextarea } from '../components/NeuroComponents';
 import { generateFastSummary, generateSpeech, extractReceiptData } from '../services/geminiService';
-import { Sparkles, Play, Plus, Trash2, Save, Upload, X, Calendar, FileText } from 'lucide-react';
+import { Sparkles, Play, Plus, Trash2, Save, Upload, X, Calendar, FileText, AlertTriangle } from 'lucide-react';
 import { VoucherItem } from '../types';
 
 export const VoucherGenerator: React.FC = () => {
@@ -30,6 +30,7 @@ export const VoucherGenerator: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const total = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
@@ -129,12 +130,31 @@ export const VoucherGenerator: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSaveVoucher = async () => {
-    if (!payee || !voucherDate || items.length === 0) {
-        alert("Please ensure Payee, Date, and at least one Item are filled.");
+  const handleSaveClick = () => {
+    if (!payee.trim()) {
+        alert("Payee Name is required.");
+        return;
+    }
+    if (!voucherDate) {
+        alert("Voucher Date is required.");
+        return;
+    }
+    if (items.length === 0) {
+        alert("At least one item is required.");
+        return;
+    }
+    
+    const currentTotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    if (currentTotal <= 0) {
+        alert("Total Amount must be greater than zero. Please check your items.");
         return;
     }
 
+    setShowConfirmDialog(true);
+  };
+
+  const executeSaveVoucher = async () => {
+    setShowConfirmDialog(false);
     setSaving(true);
 
     const payload = {
@@ -182,6 +202,8 @@ export const VoucherGenerator: React.FC = () => {
             // Optional: Redirect or clear form
         } else {
             console.warn("Backend API not reachable. Mocking success.");
+            // Slight delay to simulate network
+            await new Promise(resolve => setTimeout(resolve, 1000));
             alert(`Voucher saved (Simulation). Data logged to console.`);
             console.log("Submitted Payload:", payload);
         }
@@ -194,7 +216,7 @@ export const VoucherGenerator: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-700">New Cash Voucher</h2>
         <div className="flex gap-3">
@@ -384,7 +406,7 @@ export const VoucherGenerator: React.FC = () => {
                         <NeuroButton onClick={addItem} className="text-sm">
                             <Plus size={16} className="inline mr-2" /> Add Item
                         </NeuroButton>
-                        <NeuroButton onClick={handleSaveVoucher} disabled={saving} className="text-blue-600">
+                        <NeuroButton onClick={handleSaveClick} disabled={saving} className="text-blue-600">
                             {saving ? <Sparkles size={16} className="animate-spin inline mr-2" /> : <Save size={16} className="inline mr-2" />}
                             {saving ? 'Saving...' : 'Save Voucher'}
                         </NeuroButton>
@@ -406,6 +428,47 @@ export const VoucherGenerator: React.FC = () => {
             </NeuroCard>
         </div>
       </div>
+
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+            <div className="absolute inset-0" onClick={() => setShowConfirmDialog(false)}></div>
+            <NeuroCard className="w-full max-w-md animate-in fade-in zoom-in duration-200 relative z-10 shadow-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                        <AlertTriangle size={20} />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-700">Confirm Voucher</h3>
+                </div>
+                
+                <div className="space-y-4 mb-8 text-gray-600">
+                    <p>Are you sure you want to save this voucher with the following details?</p>
+                    <div className="bg-[#e0e5ec] p-4 rounded-xl shadow-inner text-sm space-y-2">
+                        <div className="flex justify-between border-b border-gray-300/50 pb-2">
+                            <span className="text-gray-500">Payee</span> 
+                            <span className="font-semibold text-gray-700 text-right">{payee}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-300/50 pb-2">
+                            <span className="text-gray-500">Date</span> 
+                            <span className="font-semibold text-gray-700">{voucherDate}</span>
+                        </div>
+                         <div className="flex justify-between border-b border-gray-300/50 pb-2">
+                            <span className="text-gray-500">Items</span> 
+                            <span className="font-semibold text-gray-700">{items.length}</span>
+                        </div>
+                        <div className="flex justify-between pt-1">
+                            <span className="text-gray-500">Total</span> 
+                            <span className="font-bold text-lg text-blue-600">RM {total.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="flex gap-4 justify-end">
+                    <NeuroButton onClick={() => setShowConfirmDialog(false)} className="text-sm px-6">Cancel</NeuroButton>
+                    <NeuroButton onClick={executeSaveVoucher} className="text-sm text-blue-600 font-bold px-6">Confirm Save</NeuroButton>
+                </div>
+            </NeuroCard>
+        </div>
+      )}
     </div>
   );
 };
